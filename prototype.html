@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Block-Based Website Builder</title>
+  <style>
+    body { margin: 0; font-family: sans-serif; background: #3cb371 }
+    #app { display: flex; height: 100vh }
+    #editor { flex: 1; padding: 20px; background: #00de47; border-right: 2px solid #3cb371 }
+    #preview { flex: 1; display: flex; flex-direction: column }
+    #blocklyDiv { height: calc(100% - 40px); width: 100% }
+    #actions { padding: 10px; text-align: center; background: #3cb371 }
+    #run { padding: 10px 20px; font-size: 16px; background: #4CAF50; color: #fff; border: none; border-radius: 6px; cursor: pointer }
+    iframe { flex: 1; border: 0 }
+    textarea { width: 100%; height: 150px; border: none; padding: 10px; font-family: monospace; resize: none; background: #eef }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <div id="editor">
+      <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 8px;">
+        <img src="logo.png" alt="Logo" style="height: 120px; margin: 0;" />
+        <button id="run">🟩 Generate Page</button>
+      </div>
+      <div id="blocklyDiv"></div>
+    </div>
+    <div id="preview">
+      <iframe id="frame" title="Live preview"></iframe>
+      <textarea id="htmlOut" readonly></textarea>
+    </div>
+  </div>
+
+  <!-- Blockly toolbox -->
+  <xml xmlns="https://developers.google.com/blockly/xml" id="toolbox" style="display:none">
+    <category name="Page" colour="200">
+      <block type="set_title"></block>
+      <block type="body_bg_color"></block>
+    </category>
+    <category name="Content" colour="65">
+      <block type="add_heading"></block>
+      <block type="add_paragraph"></block>
+      <block type="add_image"></block>
+      <block type="add_link"></block>
+      <block type="add_list"></block>
+      <block type="add_button"></block>
+    </category>
+  </xml>
+
+  <!-- Blockly core + field support -->
+  <script src="https://unpkg.com/blockly@8.0.0/blockly.min.js"></script>
+  <script src="https://unpkg.com/blockly/msg/en.js"></script>
+
+  <!-- Your Blockly setup code -->
+  <script>
+    window.addEventListener("load", () => {
+      let headParts = [], bodyParts = [];
+
+      function addToHead(x) { headParts.push(x); }
+      function addToBody(x) { bodyParts.push(x); }
+
+      const esc = s => (s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/\\/g, '\\\\')
+        .replace(/'/g, '&apos;')
+        .replace(/"/g, '&quot;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/\n/g, '<br>');
+
+      Blockly.defineBlocksWithJsonArray([
+        { type: "set_title", message0: "set title %1", args0: [{ type: "field_input", name: "TEXT", text: "My Website" }], previousStatement: null, nextStatement: null, colour: 200 },
+        { type: "body_bg_color", message0: "set body background colour %1", args0: [{ type: "field_colour", name: "COLOR", colour: "#00de47" }], previousStatement: null, nextStatement: null, colour: 200 },
+        { type: "add_heading", message0: "add heading %1 level %2", args0: [{ type: "field_input", name: "TEXT", text: "Welcome" }, { type: "field_dropdown", name: "LEVEL", options: [["1", "1"], ["2", "2"], ["3", "3"], ["4", "4"], ["5", "5"], ["6", "6"]] }], previousStatement: null, nextStatement: null, colour: 65 },
+        { type: "add_paragraph", message0: "add paragraph %1", args0: [{ type: "field_input", name: "TEXT", text: "Hello world!" }], previousStatement: null, nextStatement: null, colour: 65 },
+        { type: "add_image", message0: "add image src %1 alt %2", args0: [{ type: "field_input", name: "SRC", text: "https://example.com/img.png" }, { type: "field_input", name: "ALT", text: "description" }], previousStatement: null, nextStatement: null, colour: 65 },
+        { type: "add_link", message0: "add link text %1 url %2", args0: [{ type: "field_input", name: "TEXT", text: "Google" }, { type: "field_input", name: "URL", text: "https://google.com" }], previousStatement: null, nextStatement: null, colour: 65 },
+        { type: "add_list", message0: "add list items %1", args0: [{ type: "field_input", name: "ITEMS", text: "Item 1, Item 2, Item 3" }], previousStatement: null, nextStatement: null, colour: 65 },
+        { type: "add_button", message0: "add button label %1", args0: [{ type: "field_input", name: "LABEL", text: "Click Me" }], previousStatement: null, nextStatement: null, colour: 65 }
+      ]);
+
+      Blockly.JavaScript['set_title'] = blk => {
+        const t = esc(blk.getFieldValue('TEXT'));
+        return `addToHead('<title>${t}</title>');\n`;
+      };
+      Blockly.JavaScript['body_bg_color'] = blk => {
+        const c = blk.getFieldValue('COLOR');
+        return `addToHead('<style>body{background:${c};margin:0;padding:0;}</style>');\n`;
+      };
+      Blockly.JavaScript['add_heading'] = blk => {
+        const txt = esc(blk.getFieldValue('TEXT'));
+        const lvl = blk.getFieldValue('LEVEL');
+        return `addToBody('<h${lvl}>${txt}</h${lvl}>');\n`;
+      };
+      Blockly.JavaScript['add_paragraph'] = blk => {
+        const txt = esc(blk.getFieldValue('TEXT'));
+        return `addToBody('<p>${txt}</p>');\n`;
+      };
+      Blockly.JavaScript['add_image'] = blk => {
+        const src = esc(blk.getFieldValue('SRC'));
+        const alt = esc(blk.getFieldValue('ALT'));
+        return `addToBody('<img src="${src}" alt="${alt}">');\n`;
+      };
+      Blockly.JavaScript['add_link'] = blk => {
+        const txt = esc(blk.getFieldValue('TEXT'));
+        const url = esc(blk.getFieldValue('URL'));
+        return `addToBody('<a href="${url}" target="_blank">${txt}</a>');\n`;
+      };
+      Blockly.JavaScript['add_list'] = blk => {
+        const items = blk.getFieldValue('ITEMS').split(/\r?\n/).map(esc);
+        const html = `<ul>${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+        return `addToBody('${html}');\n`;
+      };
+      Blockly.JavaScript['add_button'] = blk => {
+        const label = esc(blk.getFieldValue('LABEL'));
+        return `addToBody('<button>${label}</button>');\n`;
+      };
+
+      const workspace = Blockly.inject('blocklyDiv', {
+        toolbox: document.getElementById('toolbox'),
+        trashcan: true,
+        grid: { spacing: 20, length: 3, colour: '#ccc', snap: true },
+        zoom: { controls: true, wheel: true }
+      });
+
+      document.getElementById('run').addEventListener('click', () => {
+        headParts = []; bodyParts = [];
+        // Process all top-level blocks, not just one chain
+        const topBlocks = workspace.getTopBlocks(true);
+        let allJs = '';
+        for (const block of topBlocks) {
+          allJs += Blockly.JavaScript.blockToCode(block);
+        }
+        try {
+          new Function('addToHead','addToBody', allJs)(addToHead, addToBody);
+        } catch (e) {
+          console.error(e);
+          alert("⚠️ Error in generated code. Check the browser console.");
+          return;
+        }
+        // Remove any previous background style (not needed if only added by block, but keep for safety)
+        headParts = headParts.filter((h, i, arr) => arr.findIndex(x => x.startsWith('<style>body{background:')) === i || !h.startsWith('<style>body{background:'));
+        // Do NOT add default title or background, and do NOT alert
+        const html = `<!DOCTYPE html>\n<html>\n<head>\n<meta charset=\"UTF-8\">\n${headParts.join('\n')}\n</head>\n<body>\n${bodyParts.join('\n')}\n</body>\n</html>`;
+        document.getElementById('frame').srcdoc = html;
+        document.getElementById('htmlOut').value = html;
+      });
+    });
+  </script>
+</body>
+</html>
